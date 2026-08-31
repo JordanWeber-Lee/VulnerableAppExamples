@@ -228,7 +228,7 @@ jobs:
 
       - name: Send notification email
         if: ${{ env.MAIL_CONFIGURED == 'true' }}
-        uses: dawidd6/action-send-mail@v4
+        uses: dawidd6/action-send-mail@v18
         continue-on-error: true
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
