@@ -1,0 +1,10 @@
+## Build output (kept out of the repo; source and manifests are still scanned)
+[Bb]in/
+[Oo]bj/
+node_modules/
+dist/
+.vs/
+*.user
+
+## Local scanner output
+*.sarif

@@ -1,0 +1,56 @@
+@page "/account"
+@inject CryptoService Crypto
+@inject TokenService Tokens
+@inject ProfileSerializationService Profiles
+
+<h1>Account Settings</h1>
+
+<h2>Change Password</h2>
+<div>
+    <input type="password" @bind="newPassword" placeholder="New password" />
+    <button @onclick="SavePassword">Save</button>
+</div>
+
+@if (!string.IsNullOrEmpty(storedHash))
+{
+    <p>Stored: @storedHash</p>
+}
+
+<h2>Reset Token</h2>
+<button @onclick="IssueToken">Issue Reset Token</button>
+@if (!string.IsNullOrEmpty(resetToken))
+{
+    <p>@resetToken</p>
+}
+
+<h2>Import Profile</h2>
+<textarea @bind="profileJson" rows="4" placeholder="Profile JSON"></textarea>
+<button @onclick="ApplyProfile">Apply</button>
+@if (!string.IsNullOrEmpty(profileSummary))
+{
+    <p>@profileSummary</p>
+}
+
+@code {
+    private string newPassword = string.Empty;
+    private string storedHash = string.Empty;
+    private string resetToken = string.Empty;
+    private string profileJson = string.Empty;
+    private string profileSummary = string.Empty;
+
+    private void SavePassword()
+    {
+        storedHash = Crypto.HashPassword(newPassword);
+    }
+
+    private void IssueToken()
+    {
+        resetToken = Tokens.CreatePasswordResetToken();
+    }
+
+    private void ApplyProfile()
+    {
+        var profile = Profiles.LoadProfile(profileJson);
+        profileSummary = profile?.DisplayName ?? "No profile loaded.";
+    }
+}

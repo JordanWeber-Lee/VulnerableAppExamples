@@ -1,0 +1,60 @@
+@page "/documents"
+@inject DocumentService DocumentSvc
+@inject ReportCommandService Reports
+@inject ConfigImportService ConfigImport
+
+<h1>Documents</h1>
+
+<div>
+    <input @bind="fileName" placeholder="File name" />
+    <button @onclick="OpenDocument">Open</button>
+</div>
+
+@if (!string.IsNullOrEmpty(fileContent))
+{
+    <pre>@fileContent</pre>
+}
+
+<h2>Generate Report</h2>
+<div>
+    <input @bind="reportName" placeholder="Report name" />
+    <button @onclick="RunReport">Generate</button>
+</div>
+
+@if (!string.IsNullOrEmpty(reportOutput))
+{
+    <pre>@reportOutput</pre>
+}
+
+<h2>Import Configuration</h2>
+<textarea @bind="xmlInput" rows="4" placeholder="Paste XML settings"></textarea>
+<button @onclick="ImportConfig">Import</button>
+
+@if (!string.IsNullOrEmpty(importResult))
+{
+    <p>@importResult</p>
+}
+
+@code {
+    private string fileName = string.Empty;
+    private string fileContent = string.Empty;
+    private string reportName = string.Empty;
+    private string reportOutput = string.Empty;
+    private string xmlInput = string.Empty;
+    private string importResult = string.Empty;
+
+    private void OpenDocument()
+    {
+        fileContent = DocumentSvc.ReadDocumentText(fileName);
+    }
+
+    private void RunReport()
+    {
+        reportOutput = Reports.GenerateReport(reportName);
+    }
+
+    private void ImportConfig()
+    {
+        importResult = ConfigImport.ImportSettings(xmlInput);
+    }
+}

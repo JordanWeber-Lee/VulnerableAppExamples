@@ -1,0 +1,246 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # CodeQL  (C# and JavaScript/TypeScript)  -> Security tab
+  # ---------------------------------------------------------------------------
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: csharp
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ---------------------------------------------------------------------------
+  # Semgrep OSS  (C#, JS/TS, and generic rules)  -> Security tab
+  # ---------------------------------------------------------------------------
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/owasp-top-ten \
+            --sarif --output semgrep.sarif || true
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  # ---------------------------------------------------------------------------
+  # Gitleaks  (secret detection across every file type)  -> Security tab
+  # ---------------------------------------------------------------------------
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+  # ---------------------------------------------------------------------------
+  # Trivy  (secrets + IaC/config misconfig + vulnerable dependencies)  -> Security tab
+  # ---------------------------------------------------------------------------
+  trivy:
+    name: Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+  # ---------------------------------------------------------------------------
+  # DevSkim  (Microsoft; C#, VB, JS, and more)  -> Security tab
+  # ---------------------------------------------------------------------------
+  devskim:
+    name: DevSkim
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DevSkim
+        uses: microsoft/DevSkim-Action@v1
+        with:
+          directory-to-scan: .
+          output-filename: devskim.sarif
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: devskim.sarif
+          category: devskim
+
+  # ---------------------------------------------------------------------------
+  # PSScriptAnalyzer  (PowerShell security rules)  -> Security tab
+  # ---------------------------------------------------------------------------
+  powershell:
+    name: PSScriptAnalyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          Install-Module ConvertToSARIF -Force -Scope CurrentUser
+          Import-Module ConvertToSARIF
+          Invoke-ScriptAnalyzer -Path . -Recurse -Severity @('Error','Warning','Information') |
+            ConvertTo-SARIF -FilePath psscriptanalyzer.sarif
+          if (-not (Test-Path psscriptanalyzer.sarif)) {
+            '{"version":"2.1.0","$schema":"https://json.schemastore.org/sarif-2.1.0.json","runs":[{"tool":{"driver":{"name":"PSScriptAnalyzer","rules":[]}},"results":[]}]}' |
+              Out-File -Encoding utf8 psscriptanalyzer.sarif
+          }
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: psscriptanalyzer.sarif
+          category: psscriptanalyzer
+
+  # ---------------------------------------------------------------------------
+  # Notify  -> single consolidated email of open alerts to the security owner
+  # ---------------------------------------------------------------------------
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [ codeql, semgrep, gitleaks, trivy, devskim, powershell ]
+    if: always()
+    permissions:
+      contents: read
+      security-events: read
+    env:
+      MAIL_CONFIGURED: ${{ secrets.MAIL_SERVER != '' }}
+    steps:
+      - name: Collect open alert counts
+        id: counts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          code_count=$(gh api "repos/$REPO/code-scanning/alerts?state=open&per_page=100" --paginate 2>/dev/null | jq -s 'add | length' 2>/dev/null || echo "n/a")
+          secret_count=$(gh api "repos/$REPO/secret-scanning/alerts?state=open&per_page=100" --paginate 2>/dev/null | jq -s 'add | length' 2>/dev/null || echo "n/a")
+          dep_count=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" --paginate 2>/dev/null | jq -s 'add | length' 2>/dev/null || echo "n/a")
+          {
+            echo "code=$code_count"
+            echo "secret=$secret_count"
+            echo "dep=$dep_count"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compose email body
+        id: body
+        run: |
+          {
+            echo "body<<EOF"
+            echo "Security scan completed for ${{ github.repository }}."
+            echo ""
+            echo "Run:        ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Triggered:  ${{ github.event_name }} on ${{ github.ref_name }} (${{ github.sha }})"
+            echo ""
+            echo "Open alerts (across all tools, in the Security tab):"
+            echo "  Code scanning (CodeQL, Semgrep, Trivy, DevSkim, PSScriptAnalyzer, Gitleaks): ${{ steps.counts.outputs.code }}"
+            echo "  Secret scanning:                                                             ${{ steps.counts.outputs.secret }}"
+            echo "  Dependabot (vulnerable dependencies):                                        ${{ steps.counts.outputs.dep }}"
+            echo ""
+            echo "Review the findings here:"
+            echo "  Code scanning:   ${{ github.server_url }}/${{ github.repository }}/security/code-scanning"
+            echo "  Secret scanning: ${{ github.server_url }}/${{ github.repository }}/security/secret-scanning"
+            echo "  Dependabot:      ${{ github.server_url }}/${{ github.repository }}/security/dependabot"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Send notification email
+        if: ${{ env.MAIL_CONFIGURED == 'true' }}
+        uses: dawidd6/action-send-mail@v4
+        continue-on-error: true
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: ${{ secrets.MAIL_FROM }}
+          to: ${{ vars.NOTIFY_EMAIL || 'Jordan.Weber@lee.net' }}
+          subject: "[Security Scan] ${{ github.repository }} - ${{ steps.counts.outputs.code }} code / ${{ steps.counts.outputs.secret }} secret / ${{ steps.counts.outputs.dep }} dependency alerts"
+          body: ${{ steps.body.outputs.body }}
+
+      - name: Notice (email not configured)
+        if: ${{ env.MAIL_CONFIGURED != 'true' }}
+        run: |
+          echo "::notice title=Email not configured::SMTP secrets are not set, so no email was sent. See SECURITY-SCANNING.md to enable notifications. Alert counts - code:${{ steps.counts.outputs.code }} secret:${{ steps.counts.outputs.secret }} dep:${{ steps.counts.outputs.dep }}"

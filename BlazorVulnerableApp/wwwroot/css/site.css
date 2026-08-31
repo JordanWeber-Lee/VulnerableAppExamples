@@ -1,0 +1,87 @@
+html, body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    margin: 0;
+    background: #f5f6f8;
+    color: #1f2933;
+}
+
+.page {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 230px;
+    background: #263238;
+    color: #eceff1;
+    padding: 1rem;
+}
+
+.nav-brand {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.nav-link {
+    display: block;
+    color: #cfd8dc;
+    padding: 0.5rem 0;
+    text-decoration: none;
+}
+
+.nav-link:hover {
+    color: #fff;
+}
+
+main {
+    flex: 1;
+    padding: 2rem;
+}
+
+.content {
+    max-width: 900px;
+}
+
+input, textarea, select {
+    padding: 0.4rem;
+    margin: 0.3rem 0;
+    border: 1px solid #b0bec5;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 400px;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    background: #1565c0;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0d47a1;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid #cfd8dc;
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #ffdede;
+    padding: 0.6rem 1.25rem;
+}

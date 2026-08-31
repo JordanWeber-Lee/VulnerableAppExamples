@@ -1,0 +1,44 @@
+@page "/login"
+@inject AuthenticationService Auth
+@inject NavigationHelper Navigation
+@inject NavigationManager NavigationManager
+
+<h1>Sign In</h1>
+
+<div>
+    <label>Username</label>
+    <input @bind="username" />
+</div>
+<div>
+    <label>Password</label>
+    <input type="password" @bind="password" />
+</div>
+
+<button @onclick="SignIn">Sign In</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string ReturnUrl { get; set; }
+
+    private string username = string.Empty;
+    private string password = string.Empty;
+    private string message = string.Empty;
+
+    private void SignIn()
+    {
+        if (Auth.ValidateCredentials(username, password))
+        {
+            var target = Navigation.BuildReturnUrl(ReturnUrl);
+            NavigationManager.NavigateTo(target);
+        }
+        else
+        {
+            message = "Invalid credentials.";
+        }
+    }
+}

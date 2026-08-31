@@ -1,0 +1,33 @@
+@page "/notes"
+
+<h1>Team Notes</h1>
+
+<p>Post a note for your team. Basic formatting is supported.</p>
+
+<textarea @bind="noteInput" rows="4" placeholder="Write a note..."></textarea>
+<button @onclick="PostNote">Post</button>
+
+<h2>Recent Notes</h2>
+
+<div class="notes-list">
+    @foreach (var note in notes)
+    {
+        <div class="note">
+            @((MarkupString)note)
+        </div>
+    }
+</div>
+
+@code {
+    private string noteInput = string.Empty;
+    private readonly List<string> notes = new();
+
+    private void PostNote()
+    {
+        if (!string.IsNullOrWhiteSpace(noteInput))
+        {
+            notes.Insert(0, noteInput);
+            noteInput = string.Empty;
+        }
+    }
+}

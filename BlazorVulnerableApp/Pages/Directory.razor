@@ -1,0 +1,65 @@
+@page "/directory"
+@inject EmployeeDataService EmployeeData
+@inject DirectoryLookupService DirectoryLookup
+
+<h1>Staff Directory</h1>
+
+<div>
+    <input @bind="searchTerm" placeholder="Search name, email, or department" />
+    <button @onclick="RunSearch">Search</button>
+</div>
+
+@if (results.Count > 0)
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Title</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var employee in results)
+            {
+                <tr>
+                    <td>@employee.FullName</td>
+                    <td>@employee.Email</td>
+                    <td>@employee.Department</td>
+                    <td>@employee.Title</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2>Active Directory Lookup</h2>
+<div>
+    <input @bind="accountName" placeholder="Account name" />
+    <button @onclick="RunDirectoryLookup">Look up</button>
+</div>
+
+<ul>
+    @foreach (var name in directoryResults)
+    {
+        <li>@name</li>
+    }
+</ul>
+
+@code {
+    private string searchTerm = string.Empty;
+    private string accountName = string.Empty;
+    private List<EmployeeRecord> results = new();
+    private List<string> directoryResults = new();
+
+    private void RunSearch()
+    {
+        results = EmployeeData.SearchEmployees(searchTerm);
+    }
+
+    private void RunDirectoryLookup()
+    {
+        directoryResults = DirectoryLookup.FindUsers(accountName);
+    }
+}

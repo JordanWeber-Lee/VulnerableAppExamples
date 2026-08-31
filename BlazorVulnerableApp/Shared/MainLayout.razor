@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<PageTitle>Employee Portal</PageTitle>
+
+<div class="page">
+    <div class="sidebar">
+        <div class="nav-brand">Employee Portal</div>
+        <nav>
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+            <NavLink class="nav-link" href="login">Sign In</NavLink>
+            <NavLink class="nav-link" href="directory">Directory</NavLink>
+            <NavLink class="nav-link" href="documents">Documents</NavLink>
+            <NavLink class="nav-link" href="notes">Notes</NavLink>
+        </nav>
+    </div>
+
+    <main>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>

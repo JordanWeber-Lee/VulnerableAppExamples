@@ -1,0 +1,23 @@
+{
+  "name": "files-service",
+  "version": "1.4.2",
+  "description": "Internal Files microservice",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "author": "Platform Team",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "express": "4.16.0",
+    "lodash": "4.17.4",
+    "jsonwebtoken": "8.1.0",
+    "mysql": "2.15.0",
+    "axios": "0.18.0",
+    "body-parser": "1.18.2",
+    "cookie-parser": "1.4.3",
+    "dotenv": "6.0.0"
+  }
+}
